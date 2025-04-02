@@ -318,7 +318,44 @@
             setCustomSplits(updatedSplits);
             saveDataToFirebase();
           };
-          
+          // Fix expense data to match current people
+          const fixExpenseData = () => {
+            // Only proceed if there are expenses and people
+            if (expenses.length === 0 || people.length === 0) return;
+            
+            // Update expenses to use valid people
+            const updatedExpenses = expenses.map(expense => {
+              const newExpense = {...expense};
+              
+              // If paidBy isn't in the people list, assign to first person
+              if (!people.includes(expense.paidBy)) {
+                newExpense.paidBy = people[0];
+              }
+              
+              // Make sure splits only include current people
+              const updatedSplits = {};
+              people.forEach(person => {
+                // Keep existing split or default to equal split
+                updatedSplits[person] = expense.splits[person] || (100 / people.length);
+              });
+              
+              // Normalize splits to 100%
+              const totalSplit = Object.values(updatedSplits).reduce((sum, val) => sum + val, 0);
+              if (Math.abs(totalSplit - 100) > 0.01) {
+                const factor = 100 / totalSplit;
+                Object.keys(updatedSplits).forEach(person => {
+                  updatedSplits[person] *= factor;
+                });
+              }
+              
+              newExpense.splits = updatedSplits;
+              return newExpense;
+            });
+            
+            // Update expenses state and save to Firebase
+            setExpenses(updatedExpenses);
+            saveDataToFirebase();
+          };
           // Handle changes to the new expense form
           const handleExpenseChange = (e) => {
             const { name, value } = e.target;
@@ -395,12 +432,20 @@
               const paidBy = expense.paidBy;
               const amount = expense.amount;
               
-              // Add the full amount to the person who paid
-              balances[paidBy] += amount;
+              // Handle case where paidBy is not in current people list
+              if (people.includes(paidBy)) {
+                // Add the full amount to the person who paid
+                balances[paidBy] += amount;
+              } else {
+                console.log(`Warning: Expense paid by "${paidBy}" who is not in current people list`);
+                // Skip crediting this expense since we don't know who paid
+              }
               
               // Subtract each person's share based on the split
               Object.entries(expense.splits).forEach(([person, percentage]) => {
-                balances[person] -= (amount * percentage) / 100;
+                if (people.includes(person)) {
+                  balances[person] -= (amount * percentage) / 100;
+                }
               });
             });
             
@@ -713,7 +758,7 @@
                         }}
                         className="w-full mt-2 px-4 py-2 text-red-600 border border-red-600 rounded hover:bg-red-50"
                       >
-                        Reset Example Data
+                        Reset Data
                       </button>
                     )}
                   </div>
@@ -874,6 +919,13 @@
                         Export as CSV
                       </button>
                     </div>
+                    {/* Add a fix data button */}
+                    <button
+                      onClick={fixExpenseData}
+                      className="w-full px-4 py-2 text-orange-600 border border-orange-600 rounded hover:bg-orange-50"
+                    >
+                      Fix Expense Data
+                    </button>
                   </div>
                   
                   {/* Expenses List Section */}
