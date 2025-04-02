@@ -1,5 +1,3 @@
-import React, { useState, useEffect } from 'react';
-
 const TripExpenseTracker = () => {
   // Password protection state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -532,6 +530,7 @@ const TripExpenseTracker = () => {
 };
 
 export default TripExpenseTracker;
+ReactDOM.render(<TripExpenseTracker />, document.getElementById('root'));
               ))}
             </div>
             
