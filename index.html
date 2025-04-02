@@ -34,6 +34,20 @@
         const TripExpenseTracker = () => {
           // Password protection state
           const db = firebase.firestore();
+          // Add this at the very beginning of your component (after db initialization)
+          React.useEffect(() => {
+            console.log('Testing Firebase connection');
+            db.collection('test').doc('test').set({
+              test: 'This is a test',
+              timestamp: new Date().toISOString()
+            })
+            .then(() => {
+              console.log('Firebase test write successful!');
+            })
+            .catch((error) => {
+              console.error('Firebase test write failed:', error);
+            });
+          }, []);
           const [isAuthenticated, setIsAuthenticated] = React.useState(false);
           const [password, setPassword] = React.useState('');
           const [storedPassword, setStoredPassword] = React.useState(() => {
@@ -67,17 +81,22 @@
           // For custom split percentages in the form
           const [customSplits, setCustomSplits] = React.useState({});
           
-          // Save password to local storage
+          // Check if already authenticated through local storage
           React.useEffect(() => {
             try {
-              if (storedPassword) {
-                localStorage.setItem('trip-tracker-password', storedPassword);
-                    if (isAuthenticated && storedPassword) {
-                      saveDataToFirebase();
-                    }
+              const lastAuth = localStorage.getItem('trip-tracker-auth-time');
+              if (lastAuth && storedPassword) {
+                // Auto-login if authenticated in the last 24 hours
+                const authTime = parseInt(lastAuth, 10);
+                const now = new Date().getTime();
+                if (now - authTime < 24 * 60 * 60 * 1000) {
+                  setIsAuthenticated(true);
+                  // Add this line to load data on auto-login
+                  loadDataFromFirebase(storedPassword);
+                }
               }
             } catch (error) {
-              console.error('Error saving to localStorage:', error);
+              console.error('Error reading from localStorage:', error);
             }
           }, [storedPassword]);
           
@@ -124,38 +143,50 @@
               alert('There was an error processing your login. If using private browsing, some features may not work.');
             }
           };
-
           // Load data from Firebase
           const loadDataFromFirebase = async (tripPassword) => {
             try {
+              console.log('Attempting to load data from Firebase with password:', tripPassword);
+              
               const docRef = db.collection('trips').doc(tripPassword);
               const doc = await docRef.get();
               
               if (doc.exists) {
+                console.log('Found data in Firebase:', doc.data());
                 const data = doc.data();
                 setPeople(data.people || ['Person 1', 'Person 2']);
                 setExpenses(data.expenses || []);
                 setCustomSplits(data.customSplits || {});
+                console.log('Data loaded successfully from Firebase');
+              } else {
+                console.log('No data found in Firebase for this password');
               }
             } catch (error) {
               console.error('Error loading data from Firebase:', error);
             }
           };
-
           // Save data to Firebase
           const saveDataToFirebase = () => {
-            if (!storedPassword) return;
-            
-            try {
-              db.collection('trips').doc(storedPassword).set({
-                people,
-                expenses,
-                customSplits,
-                lastUpdated: new Date().toISOString()
-              });
-            } catch (error) {
-              console.error('Error saving data to Firebase:', error);
+            if (!storedPassword) {
+              console.log('No password set, not saving to Firebase');
+              return;
             }
+            
+            console.log('Attempting to save to Firebase with password:', storedPassword);
+            console.log('Data to save:', { people, expenses, customSplits });
+            
+            db.collection('trips').doc(storedPassword).set({
+              people,
+              expenses,
+              customSplits,
+              lastUpdated: new Date().toISOString()
+            })
+            .then(() => {
+              console.log('Firebase save successful!');
+            })
+            .catch((error) => {
+              console.error('Firebase save error:', error);
+            });
           };
           // Handle logout
           const handleLogout = () => {
