@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Your Firebase configuration - this uses your actual values
+    const firebaseConfig = {
+      apiKey: "AIzaSyBIUufXK4GjIGr3IDNWucoXOvjhq6daE3E",
+      authDomain: "cost-splitter-bcb91.firebaseapp.com",
+      projectId: "cost-splitter-bcb91",
+      storageBucket: "cost-splitter-bcb91.firebasestorage.app",
+      messagingSenderId: "303592077692",
+      appId: "1:303592077692:web:69ce27e3744aeff6e50cf9",
+      measurementId: "G-YXZR57BGQX"
+    };
+    
+    // Initialize Firebase (using compat version)
+    firebase.initializeApp(firebaseConfig);
+  </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trip Expense Tracker</title>
@@ -14,6 +33,7 @@
     <script type="text/babel">
         const TripExpenseTracker = () => {
           // Password protection state
+          const db = firebase.firestore();
           const [isAuthenticated, setIsAuthenticated] = React.useState(false);
           const [password, setPassword] = React.useState('');
           const [storedPassword, setStoredPassword] = React.useState(() => {
@@ -52,6 +72,9 @@
             try {
               if (storedPassword) {
                 localStorage.setItem('trip-tracker-password', storedPassword);
+                    if (isAuthenticated && storedPassword) {
+                      saveDataToFirebase();
+                    }
               }
             } catch (error) {
               console.error('Error saving to localStorage:', error);
@@ -74,29 +97,66 @@
               console.error('Error reading from localStorage:', error);
             }
           }, [storedPassword]);
-          
+          // Add this effect somewhere with your other effects
+          React.useEffect(() => {
+            if (isAuthenticated && storedPassword) {
+              saveDataToFirebase();
+            }
+          }, [people, expenses, customSplits]); // This will trigger when any of these change
+
           // Handle login
           const handleLogin = () => {
             try {
-              if (!storedPassword) {
-                // First time setup - store the password
-                setStoredPassword(password);
-                setIsAuthenticated(true);
-                localStorage.setItem('trip-tracker-auth-time', new Date().getTime().toString());
-              } else if (password === storedPassword) {
-                // Password matches
-                setIsAuthenticated(true);
-                localStorage.setItem('trip-tracker-auth-time', new Date().getTime().toString());
-              } else {
-                // Wrong password
-                alert('Incorrect password');
+              if (!password.trim()) {
+                alert('Please enter a password');
+                return;
               }
+              
+              setIsAuthenticated(true);
+              setStoredPassword(password);
+              localStorage.setItem('trip-tracker-password', password);
+              localStorage.setItem('trip-tracker-auth-time', new Date().getTime().toString());
+              
+              // Load data from Firebase based on password
+              loadDataFromFirebase(password);
             } catch (error) {
               console.error('Error during login:', error);
               alert('There was an error processing your login. If using private browsing, some features may not work.');
             }
           };
-          
+
+          // Load data from Firebase
+          const loadDataFromFirebase = async (tripPassword) => {
+            try {
+              const docRef = db.collection('trips').doc(tripPassword);
+              const doc = await docRef.get();
+              
+              if (doc.exists) {
+                const data = doc.data();
+                setPeople(data.people || ['Person 1', 'Person 2']);
+                setExpenses(data.expenses || []);
+                setCustomSplits(data.customSplits || {});
+              }
+            } catch (error) {
+              console.error('Error loading data from Firebase:', error);
+            }
+          };
+
+          // Save data to Firebase
+          const saveDataToFirebase = () => {
+            if (!storedPassword) return;
+            
+            try {
+              db.collection('trips').doc(storedPassword).set({
+                people,
+                expenses,
+                customSplits,
+                lastUpdated: new Date().toISOString()
+              });
+            } catch (error) {
+              console.error('Error saving data to Firebase:', error);
+            }
+          };
           // Handle logout
           const handleLogout = () => {
             setIsAuthenticated(false);
@@ -146,6 +206,7 @@
               updatedSplits[newPersonName.trim()] = { ...updatedSplits[newPersonName.trim()] || {}, [person]: 0 };
             }
             setCustomSplits(updatedSplits);
+            saveDataToFirebase();
           };
           
           // Remove a person
@@ -180,6 +241,7 @@
               delete updatedSplits[person][personToRemove];
             });
             setCustomSplits(updatedSplits);
+            saveDataToFirebase();
           };
           
           // Handle changes to the new expense form
@@ -217,6 +279,7 @@
               people.forEach(person => {
                 if (splits[person] === undefined) splits[person] = 0;
               });
+              
             }
             
             const newExpenseItem = {
@@ -228,6 +291,7 @@
             };
             
             setExpenses([...expenses, newExpenseItem]);
+            saveDataToFirebase();
             
             // Reset form
             setNewExpense({
@@ -241,6 +305,7 @@
           // Remove an expense
           const removeExpense = (id) => {
             setExpenses(expenses.filter(expense => expense.id !== id));
+            saveDataToFirebase();
           };
           
           // Calculate who owes what
@@ -403,6 +468,8 @@
                   setPeople(importedData.people);
                   setExpenses(importedData.expenses);
                   setCustomSplits(importedData.customSplits || {});
+                  saveDataToFirebase();
+
                 } catch (error) {
                   alert('Error importing data: ' + error.message);
                 }
