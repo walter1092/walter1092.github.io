@@ -154,10 +154,54 @@
               if (doc.exists) {
                 console.log('Found data in Firebase:', doc.data());
                 const data = doc.data();
-                setPeople(data.people || ['Person 1', 'Person 2']);
-                setExpenses(data.expenses || []);
-                setCustomSplits(data.customSplits || {});
-                console.log('Data loaded successfully from Firebase');
+                const loadedPeople = data.people || ['Person 1', 'Person 2'];
+                const loadedExpenses = data.expenses || [];
+                const loadedSplits = data.customSplits || {};
+                
+                // Check if expenses need updating (paidBy referencing people that don't exist)
+                const updatedExpenses = loadedExpenses.map(expense => {
+                  const newExpense = {...expense};
+                  
+                  // If paidBy isn't in the people list, assign to first person
+                  if (!loadedPeople.includes(expense.paidBy)) {
+                    newExpense.paidBy = loadedPeople[0];
+                  }
+                  
+                  // Update splits to only include current people
+                  const updatedSplits = {};
+                  let splitTotal = 0;
+                  
+                  // Keep splits for existing people
+                  Object.entries(expense.splits).forEach(([person, percentage]) => {
+                    if (loadedPeople.includes(person)) {
+                      updatedSplits[person] = percentage;
+                      splitTotal += percentage;
+                    }
+                  });
+                  
+                  // If splits don't add up to 100%, distribute remainder evenly
+                  if (Math.abs(splitTotal - 100) > 0.01) {
+                    const remainingPercent = 100 - splitTotal;
+                    const perPersonAdjustment = remainingPercent / loadedPeople.length;
+                    
+                    loadedPeople.forEach(person => {
+                      updatedSplits[person] = (updatedSplits[person] || 0) + perPersonAdjustment;
+                    });
+                  }
+                  
+                  newExpense.splits = updatedSplits;
+                  return newExpense;
+                });
+                
+                setPeople(loadedPeople);
+                setExpenses(updatedExpenses);
+                setCustomSplits(loadedSplits);
+                console.log('Data loaded and migrated successfully from Firebase');
+                
+                // Save the migrated data back if changes were made
+                if (JSON.stringify(loadedExpenses) !== JSON.stringify(updatedExpenses)) {
+                  setTimeout(() => saveDataToFirebase(), 500);
+                }
               } else {
                 console.log('No data found in Firebase for this password');
               }
@@ -622,6 +666,12 @@
                   <div className="mb-8 p-4 bg-gray-50 rounded-lg shadow">
                     <h2 className="text-xl font-bold mb-4 text-blue-600">People</h2>
                     
+                    {people.some(p => p.startsWith('Person ')) && (
+                      <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded">
+                        ⚠️ You're using default person names. Consider updating them to real names.
+                      </div>
+                    )}
+                    
                     <div className="flex flex-wrap gap-2 mb-4">
                       {people.map(person => (
                         <div key={person} className="flex items-center bg-white px-3 py-2 rounded-full border">
@@ -652,6 +702,20 @@
                         Add Person
                       </button>
                     </div>
+                    {/* Reset button here */}
+                    {expenses.length === 1 && expenses[0].description === 'Hotel' && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Reset all expense data? This will keep your people but remove all expenses.')) {
+                            setExpenses([]);
+                            saveDataToFirebase();
+                          }
+                        }}
+                        className="w-full mt-2 px-4 py-2 text-red-600 border border-red-600 rounded hover:bg-red-50"
+                      >
+                        Reset Example Data
+                      </button>
+                    )}
                   </div>
                   
                   {/* Add New Expense Section */}
