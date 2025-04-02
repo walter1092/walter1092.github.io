@@ -14,9 +14,9 @@
     <script type="text/babel">
         const TripExpenseTracker = () => {
           // Password protection state
-          const [isAuthenticated, setIsAuthenticated] = useState(false);
-          const [password, setPassword] = useState('');
-          const [storedPassword, setStoredPassword] = useState(() => {
+          const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+          const [password, setPassword] = React.useState('');
+          const [storedPassword, setStoredPassword] = React.useState(() => {
             try {
               const saved = localStorage.getItem('trip-tracker-password');
               return saved || '';
@@ -26,18 +26,18 @@
           });
           
           // State for new person name input
-          const [newPersonName, setNewPersonName] = useState('');
+          const [newPersonName, setNewPersonName] = React.useState('');
           
           // State for people
-          const [people, setPeople] = useState(['Person 1', 'Person 2']);
+          const [people, setPeople] = React.useState(['Person 1', 'Person 2']);
           
           // State for expenses
-          const [expenses, setExpenses] = useState([
+          const [expenses, setExpenses] = React.useState([
             { id: 1, description: 'Hotel', amount: 200, paidBy: 'Person 1', splits: { 'Person 1': 50, 'Person 2': 50 } }
           ]);
           
           // State for new expense form
-          const [newExpense, setNewExpense] = useState({
+          const [newExpense, setNewExpense] = React.useState({
             description: '',
             amount: '',
             paidBy: 'Person 1',
@@ -45,10 +45,10 @@
           });
           
           // For custom split percentages in the form
-          const [customSplits, setCustomSplits] = useState({});
+          const [customSplits, setCustomSplits] = React.useState({});
           
           // Save password to local storage
-          useEffect(() => {
+          React.useEffect(() => {
             try {
               if (storedPassword) {
                 localStorage.setItem('trip-tracker-password', storedPassword);
@@ -59,7 +59,7 @@
           }, [storedPassword]);
           
           // Check if already authenticated through local storage
-          useEffect(() => {
+          React.useEffect(() => {
             try {
               const lastAuth = localStorage.getItem('trip-tracker-auth-time');
               if (lastAuth && storedPassword) {
@@ -535,16 +535,7 @@
                           >
                             ×
                           </button>
-                      </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        };
-        
-        export default TripExpenseTracker;
-        ReactDOM.render(<TripExpenseTracker />, document.getElementById('root'));
+                        </div>
                       ))}
                     </div>
                     
@@ -813,9 +804,16 @@
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        };
         
-        // Render the component
+        // Render the component - remove the export default
         ReactDOM.render(<TripExpenseTracker />, document.getElementById('root'));
     </script>
-</body>
-</html>
+    </body>
+    </html>
